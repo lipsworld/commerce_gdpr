@@ -1,0 +1,112 @@
+<?php
+
+/**
+ * @file
+ * Contains admin forms for the module.
+ */
+
+/**
+ * Configuration form builder.
+ */
+function commerce_gdpr_admin_form($form, &$form_state) {
+  $form['data_retention'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Order data retention period'),
+    '#default_value' => variable_get('commerce_gdpr_data_retention', 0),
+    '#description' => t('Enter number of days after which inactive data will be anonymized, 0 - no automatic anonymization.'),
+  );
+
+  $form['anonimized_fields'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Fields subject to anonymization'),
+    '#tree' => TRUE,
+  );
+
+  $entity_info = entity_get_info();
+  $selected_fields = variable_get('commerce_gdpr_anonimized_fields', array());
+  foreach (COMMERCE_GDPR_AFFECTED_ENTITY_TYPES as $type) {
+    $entity_info = entity_get_info($type);
+    $form['anonimized_fields'][$type] = array(
+      '#type' => 'fieldset',
+      '#title' => $entity_info['label'],
+    );
+    foreach ($entity_info['bundles'] as $bundle => $bundle_info) {
+      if (count($entity_info['bundles']) > 1) {
+        $form['anonimized_fields'][$type][$bundle] = array(
+          '#type' => 'fieldset',
+          '#title' => $bundle_info['label'],
+        );
+      }
+      else {
+        $form['anonimized_fields'][$type]['#title'] = $bundle_info['label'];
+      }
+
+      $field_instances = field_info_instances($type, $bundle);
+      if (empty($field_instances)) {
+        $form['anonimized_fields'][$type][$bundle]['info'] = array(
+          '#markup' => t('No field instances available.'),
+        );
+      }
+      else {
+        foreach ($field_instances as $field_name => $instance_info) {
+
+          // Excluse customer profile type fields, those will be anonimized
+          // along with the order. Also exclude line items.
+          // TODO: Actually all entity reference field types should be
+          // handled differently, but it's not needed at the moment.
+          $excluded_fields = array(
+            'commerce_line_item_reference',
+            'commerce_customer_profile_reference',
+          );
+          $info = field_info_field($field_name);
+          if (in_array($info['type'], $excluded_fields)) {
+            continue;
+          }
+
+          $form['anonimized_fields'][$type][$bundle][$field_name] = array(
+            '#type' => 'checkbox',
+            '#title' => $instance_info['label'],
+            '#default_value' => !empty($selected_fields[$type][$bundle][$field_name]),
+          );
+        }
+      }
+    }
+  }
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save settings'),
+  );
+
+  return $form;
+}
+
+/**
+ * Admin form validate handler.
+ */
+function commerce_gdpr_admin_form_validate($form, &$form_state) {
+  if (!is_numeric($form_state['values']['data_retention'])) {
+    form_set_error('data_retention', t('Enter a valid data retention value.'));
+  }
+}
+
+/**
+ * Admin form submit handler.
+ */
+function commerce_gdpr_admin_form_submit($form, &$form_state) {
+  variable_set('commerce_gdpr_data_retention', $form_state['values']['data_retention']);
+
+  $selected_fields = array();
+  foreach ($form_state['values']['anonimized_fields'] as $type => $type_data) {
+    foreach ($type_data as $bundle => $bundle_data) {
+      foreach ($bundle_data as $field_name => $value) {
+        if ($value) {
+          $selected_fields[$type][$bundle][$field_name] = $field_name;
+        }
+      }
+    }
+  }
+  variable_set('commerce_gdpr_anonimized_fields', $selected_fields);
+
+  drupal_set_message(t('Settings saved.'));
+}

@@ -1,0 +1,42 @@
+<?php
+
+/**
+ * @file
+ * Contains install, uninstall and update procedures for the module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function commerce_gdpr_schema() {
+  $schema = array();
+
+  $schema['commerce_gdpr_access'] = array(
+    'description' => 'Contains last access data for commerce entities containing user data.',
+    'fields' => array(
+      'type' => array(
+        'description' => 'Entity type',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+      'id' => array(
+        'description' => 'Entity ID',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'last_access' => array(
+        'description' => 'Last access timestamp',
+        'type' => 'int',
+        'size' => 'big',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('type', 'id'),
+    'indexes' => array(
+      'last_access' => array('last_access'),
+    ),
+  );
+
+  return $schema;
+}
