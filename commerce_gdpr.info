@@ -1,5 +1,5 @@
 name = Commerce GDPR
-description = Allows user and order data anonimization for complience with the GDPR EU directive.
+description = Allows user and order data anonymization for complience with the GDPR EU directive.
 core = 7.x
 package = Commerce (contrib)
 configure = admin/commerce/config/commerce-gdpr

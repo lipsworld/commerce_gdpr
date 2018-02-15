@@ -10,14 +10,14 @@
  */
 
 /**
- * Allows altering information about anonimizable entity properties.
+ * Allows altering information about anonymizable entity properties.
  *
  * NOTE: because of inability to save a customer profile that is bound
  * to an order, it is not allowed to add properties for
  * commerce_customer_profile entity type here.
  *
  * @param array $entity_property_info
- *   Array containing information about anonimizable entity properties.
+ *   Array containing information about anonymizable entity properties.
  *
  * @see _commerce_gdpr_get_entity_property_info
  */

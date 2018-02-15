@@ -12,7 +12,7 @@ function commerce_gdpr_admin_form($form, &$form_state) {
 
   // Issue a warining if a site-specific hashing salt is not set.
   if (!variable_get('commerce_gdpr_salt', FALSE)) {
-    drupal_set_message(t('To ensure increased safety of anonimized data, please set a platform-specific hashing salt. More information can be found on the module !help.', array(
+    drupal_set_message(t('To ensure increased safety of anonymized data, please set a platform-specific hashing salt. More information can be found on the module !help.', array(
       '!help' => l(t('help page'), 'admin/help/commerce_gdpr', array(
         'attributes' => array('target' => '_blank'),
       )),
@@ -26,41 +26,41 @@ function commerce_gdpr_admin_form($form, &$form_state) {
     '#description' => t('Enter number of days after which inactive data will be anonymized, 0 - no automatic anonymization.'),
   );
 
-  $form['anonimized_fields'] = array(
+  $form['anonymized_fields'] = array(
     '#type' => 'fieldset',
     '#title' => t('Fields subject to anonymization'),
     '#tree' => TRUE,
   );
 
   $entity_info = entity_get_info();
-  $selected_fields = variable_get('commerce_gdpr_anonimized_fields', array());
+  $selected_fields = variable_get('commerce_gdpr_anonymized_fields', array());
   foreach (COMMERCE_GDPR_AFFECTED_ENTITY_TYPES as $type) {
     $entity_info = entity_get_info($type);
-    $form['anonimized_fields'][$type] = array(
+    $form['anonymized_fields'][$type] = array(
       '#type' => 'fieldset',
       '#title' => $entity_info['label'],
     );
     foreach ($entity_info['bundles'] as $bundle => $bundle_info) {
       if (count($entity_info['bundles']) > 1) {
-        $form['anonimized_fields'][$type][$bundle] = array(
+        $form['anonymized_fields'][$type][$bundle] = array(
           '#type' => 'fieldset',
           '#title' => $bundle_info['label'],
         );
       }
       else {
-        $form['anonimized_fields'][$type]['#title'] = $bundle_info['label'];
+        $form['anonymized_fields'][$type]['#title'] = $bundle_info['label'];
       }
 
       $field_instances = field_info_instances($type, $bundle);
       if (empty($field_instances)) {
-        $form['anonimized_fields'][$type][$bundle]['info'] = array(
+        $form['anonymized_fields'][$type][$bundle]['info'] = array(
           '#markup' => t('No field instances available.'),
         );
       }
       else {
         foreach ($field_instances as $field_name => $instance_info) {
 
-          // Excluse customer profile type fields, those will be anonimized
+          // Excluse customer profile type fields, those will be anonymized
           // along with the order. Also exclude line items.
           // TODO: Actually all entity reference field types should be
           // handled differently, but it's not needed at the moment.
@@ -73,7 +73,7 @@ function commerce_gdpr_admin_form($form, &$form_state) {
             continue;
           }
 
-          $form['anonimized_fields'][$type][$bundle][$field_name] = array(
+          $form['anonymized_fields'][$type][$bundle][$field_name] = array(
             '#type' => 'checkbox',
             '#title' => $instance_info['label'],
             '#default_value' => !empty($selected_fields[$type][$bundle][$field_name]),
@@ -107,7 +107,7 @@ function commerce_gdpr_admin_form_submit($form, &$form_state) {
   variable_set('commerce_gdpr_data_retention', $form_state['values']['data_retention']);
 
   $selected_fields = array();
-  foreach ($form_state['values']['anonimized_fields'] as $type => $type_data) {
+  foreach ($form_state['values']['anonymized_fields'] as $type => $type_data) {
     foreach ($type_data as $bundle => $bundle_data) {
       foreach ($bundle_data as $field_name => $value) {
         if ($value) {
@@ -116,7 +116,7 @@ function commerce_gdpr_admin_form_submit($form, &$form_state) {
       }
     }
   }
-  variable_set('commerce_gdpr_anonimized_fields', $selected_fields);
+  variable_set('commerce_gdpr_anonymized_fields', $selected_fields);
 
   drupal_set_message(t('Settings saved.'));
 }

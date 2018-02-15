@@ -9,7 +9,7 @@
  * Implements hook_user_view().
  */
 function commerce_gdpr_user_view($account, $view_mode, $langcode) {
-  if ($account->uid == $GLOBALS['user']->uid || user_access('anonimize other users data')) {
+  if ($account->uid == $GLOBALS['user']->uid || user_access('anonymize other users data')) {
     $account->content['gdpr_widget'] = drupal_get_form('commerce_gdpr_user_form', $account->uid);
     $account->content['gdpr_widget']['#weight'] = 999;
   }
@@ -76,12 +76,12 @@ function commerce_gdpr_modal_form($form, &$form_state) {
   else {
     if ($form_state['uid'] == $GLOBALS['user']->uid) {
       $form['message'] = array(
-        '#markup' => t('This will anonimize all your user, order and customer profile data so it will only be possible to use for statistical purposes. It will also make your account inactive and log you out of the site instantly. Are you sure?'),
+        '#markup' => t('This will anonymize all your user, order and customer profile data so it will only be possible to use for statistical purposes. It will also make your account inactive and log you out of the site instantly. Are you sure?'),
       );
     }
     else {
       $form['message'] = array(
-        '#markup' => t('Are you sure yuo wish to anonimize data of this user?'),
+        '#markup' => t('Are you sure yuo wish to anonymize data of this user?'),
       );
     }
   }
@@ -96,7 +96,7 @@ function commerce_gdpr_modal_form($form, &$form_state) {
       'callback' => 'commerce_gdpr_user_ajax',
     ),
   );
-  $form['actions']['anonimize'] = array(
+  $form['actions']['anonymize'] = array(
     '#type' => 'submit',
     '#value' => t("Yes, let's do it"),
     '#ajax' => array(
@@ -116,7 +116,7 @@ function commerce_gdpr_user_ajax($form, $form_state) {
 
   $commands = array();
   $trigger = end($form_state['triggering_element']['#parents']);
-  if ($trigger === 'back' || $trigger === 'anonimize') {
+  if ($trigger === 'back' || $trigger === 'anonymize') {
     $commands[] = ctools_modal_command_dismiss();
     if ($trigger === 'back') {
       $messages = theme('status_messages');
@@ -146,11 +146,11 @@ function commerce_gdpr_user_ajax($form, $form_state) {
 function commerce_gdpr_modal_form_submit($form, &$form_state) {
   $trigger = end($form_state['triggering_element']['#parents']);
 
-  if ($trigger === 'anonimize') {
+  if ($trigger === 'anonymize') {
 
     $queue_items = array();
 
-    // Better don't anonimize the superuser data.
+    // Better don't anonymize the superuser data.
     if ($form_state['uid'] != 1) {
       $queue_items[] = array(
         'type' => 'user',
@@ -190,7 +190,7 @@ function commerce_gdpr_modal_form_submit($form, &$form_state) {
       session_destroy();
 
       $form_state['redirect'] = '';
-      drupal_set_message(t('Your account data has been scheduled for anonimization.'));
+      drupal_set_message(t('Your account data has been scheduled for anonymization.'));
     }
     else {
       drupal_set_message(t('Account data has been scheduled for anonymization.'));
