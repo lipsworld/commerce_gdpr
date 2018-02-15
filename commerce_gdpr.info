@@ -5,3 +5,4 @@ package = Commerce (contrib)
 configure = admin/commerce/config/commerce-gdpr
 dependencies[] = commerce_order
 dependencies[] = ctools
+files[] = commerce_gdpr.test

@@ -1,0 +1,147 @@
+<?php
+
+/**
+ * @file
+ * Includes CommerceGdprUnitTestCase class.
+ */
+
+/**
+ * Includes tests for the most important functions of the module.
+ *
+ * @see DrupalUnitTestCase
+ *
+ * @ingroup commerce_gdpr
+ */
+class CommerceGdprUnitTestCase extends DrupalUnitTestCase {
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'Commerce GPR unit tests',
+      'description' => 'Test proper operation of key Commerce GPR functions.',
+      'group' => 'Drupal Commerce',
+    );
+  }
+
+  /**
+   * Set up the test environment.
+   *
+   * Note that we use drupal_load() instead of passing our module dependency
+   * to parent::setUp(). That's because we're using DrupalUnitTestCase, and
+   * thus we don't want to install the module, only load it's code.
+   *
+   * Also, DrupalUnitTestCase can't actually install modules. This is by
+   * design.
+   */
+  public function setUp() {
+    drupal_load('module', 'commerce_gdpr');
+    $GLOBALS['drupal_hash_salt'] = hash('md5', mt_rand());
+    parent::setUp();
+  }
+
+  /**
+   * Test commerce_gdpr_anonymize_value().
+   */
+  public function testAnonymizeValueFunction() {
+    $value = mt_rand();
+
+    $expected = hash_hmac('md5', $value, $GLOBALS['drupal_hash_salt']);
+    $actual = commerce_gdpr_anonymize_value($value, array(
+      'type' => 'hash',
+    ));
+    $this->assertEqual($expected, $actual, 'Is the input hashed?');
+
+    $actual = commerce_gdpr_anonymize_value($value, array(
+      'type' => 'clear',
+    ));
+    $this->assertEqual(0, $actual, 'Is the input cleared?');
+  }
+
+}
+
+/**
+ * Includes tests for the most important functions of the module.
+ *
+ * @see DrupalUnitTestCase
+ *
+ * @ingroup commerce_gdpr
+ */
+class CommerceGdprFunctionalTestCase extends DrupalWebTestCase {
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'Commerce GPR functional tests',
+      'description' => 'Test proper operation of key Commerce GPR functions.',
+      'group' => 'Drupal Commerce',
+    );
+  }
+
+  public function setUp() {
+    // We call parent::setUp() with the list of modules we want to enable.
+    parent::setUp('commerce_gdpr', 'commerce_order_ui', 'commerce_customer_ui', 'commerce_product_ui');
+    $GLOBALS['drupal_hash_salt'] = hash('md5', mt_rand());
+    $this->example_value = 'example value';
+    $this->expected = hash_hmac('md5', $this->example_value, $GLOBALS['drupal_hash_salt']);
+  }
+
+  /**
+   * Order anonymization test.
+   */
+  protected function orderAnonymizationTest() {
+    $order = new stdClass();
+    $order->order_id = 1;
+    $order->type = 'commerce_order';
+    $order->status = 'pending';
+    $order->created = REQUEST_TIME;
+    $order->uid = 1;
+    $order->revision_id = 1;
+    $order->hostname = $this->example_value;
+    $order->mail = $this->example_value;
+
+    commerce_gdpr_anonymize_entity('commerce_order', $order);
+
+    $this->assertEqual($this->expected, $order->mail, 'Is the order mail anonymized properly?');
+  }
+
+  /**
+   * Customer profile anonymization test.
+   *
+   * Tests if entity field values are anonymized.
+   */
+  protected function profileAnonymizationTest() {
+    $profile = new stdClass();
+    $profile->profile_id = 1;
+    $profile->type = 'billing';
+    $profile->commerce_customer_address = array(
+      LANGUAGE_NONE => array(
+        array(
+          'name_line' => $this->example_value,
+        ),
+      ),
+    );
+    $fields = array(
+      'commerce_customer_address' => 'commerce_customer_address',
+    );
+    commerce_gdpr_anonymize_entity('commerce_customer_profile', $profile, $fields);
+
+    $this->assertEqual($this->expected, $profile->commerce_customer_address[LANGUAGE_NONE][0]['name_line'], 'Is the customer profile name_line address field item anonymized properly?');
+  }
+
+  /**
+   * Functional tests for the module.
+   *
+   * The included tests can be run on the same environment,
+   * so they are placed in one method to save execution time.
+   */
+  public function testAnonymizeEntityFunction() {
+
+    $this->orderAnonymizationTest();
+    $this->profileAnonymizationTest();
+  }
+
+}

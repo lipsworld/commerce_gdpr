@@ -348,13 +348,15 @@ function commerce_gdpr_user_login(&$edit, $account) {
  *   Entity type.
  * @param object $entity
  *   Drupal entity.
+ * @param array $field_data
+ *   Array of field anonymization data.
  * @param bool $is_default_revision
  *   Is this the default revision of an entity? Internal use only.
  * @param bool $force
  *   If set to TRUE, entity will be anonymized even if
  *   it is already marked as anonymized.
  */
-function commerce_gdpr_anonymize_entity($type, $entity, $is_default_revision = TRUE, $force = FALSE) {
+function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL, $is_default_revision = TRUE, $force = FALSE) {
   list($id, $vid, $bundle) = entity_extract_ids($type, $entity);
 
   // Set commerce_gdpr parameter to prevent executing other module hooks.
@@ -369,6 +371,11 @@ function commerce_gdpr_anonymize_entity($type, $entity, $is_default_revision = T
   }
 
   $entity_info = entity_get_info($type);
+
+  if (!isset($field_data)) {
+    $fields = variable_get('commerce_gdpr_anonymized_fields', array());
+    $field_data = isset($fields[$type][$bundle]) ? $fields[$type][$bundle] : FALSE;
+  }
 
   // Go for entity revisions first. NOTE: Why is there no API to
   // load all revisions?
@@ -386,12 +393,10 @@ function commerce_gdpr_anonymize_entity($type, $entity, $is_default_revision = T
           $entity_info['entity keys']['revision'] => $revision_id,
         ));
         $revision = reset($revisions);
-        commerce_gdpr_anonymize_entity($type, $revision, FALSE, $force);
+        commerce_gdpr_anonymize_entity($type, $revision, $field_data, FALSE, $force);
       }
     }
   }
-
-  $fields = variable_get('commerce_gdpr_anonymized_fields');
 
   // TODO: Are there any other data types that should be subject to
   // anonymization? Other data types will be cleared.
@@ -402,9 +407,9 @@ function commerce_gdpr_anonymize_entity($type, $entity, $is_default_revision = T
 
   $updated = FALSE;
 
-  if (!empty($fields[$type][$bundle])) {
+  if (!empty($field_data)) {
     $anonymization_data = array();
-    foreach ($fields[$type][$bundle] as $field_name) {
+    foreach ($field_data as $field_name) {
       if (!empty($entity->{$field_name})) {
 
         // Determine anonymization process parameters.
@@ -429,7 +434,7 @@ function commerce_gdpr_anonymize_entity($type, $entity, $is_default_revision = T
       }
     }
 
-    // anonymize field values.
+    // Anonymize field values.
     if (!empty($anonymization_data)) {
       $updated = TRUE;
       foreach ($anonymization_data as $field_name => $column_data) {
