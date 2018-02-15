@@ -68,7 +68,9 @@ class CommerceGdprUnitTestCase extends DrupalUnitTestCase {
  *
  * @ingroup commerce_gdpr
  */
-class CommerceGdprFunctionalTestCase extends DrupalWebTestCase {
+class CommerceGdprFunctionalTestCase extends CommerceBaseTestCase {
+
+  protected $profile = 'minimal';
 
   /**
    * {@inheritdoc}
@@ -83,7 +85,9 @@ class CommerceGdprFunctionalTestCase extends DrupalWebTestCase {
 
   public function setUp() {
     // We call parent::setUp() with the list of modules we want to enable.
-    parent::setUp('commerce_gdpr', 'commerce_order_ui', 'commerce_customer_ui', 'commerce_product_ui');
+    $modules = parent::setUpHelper('all');
+    $modules[] = 'commerce_gdpr';
+    parent::setUp($modules);
     $GLOBALS['drupal_hash_salt'] = hash('md5', mt_rand());
     $this->example_value = 'example value';
     $this->expected = hash_hmac('md5', $this->example_value, $GLOBALS['drupal_hash_salt']);

@@ -3,6 +3,7 @@ description = Allows user and order data anonymization for complience with the G
 core = 7.x
 package = Commerce (contrib)
 configure = admin/commerce/config/commerce-gdpr
+dependencies[] = commerce
 dependencies[] = commerce_order
 dependencies[] = ctools
 files[] = commerce_gdpr.test
