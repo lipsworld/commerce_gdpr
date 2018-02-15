@@ -71,6 +71,53 @@ function _commerce_gdpr_get_entity_property_info() {
 }
 
 /**
+ * Implements hook_help().
+ */
+function commerce_gdpr_help($path, $arg) {
+  if ($path === 'admin/help#commerce_gdpr') {
+    $filepath = dirname(__FILE__) . '/README.txt';
+    if (file_exists($filepath)) {
+      $readme = file_get_contents($filepath);
+      if (module_exists('markdown')) {
+        $filters = module_invoke('markdown', 'filter_info');
+        $info = $filters['filter_markdown'];
+
+        if (function_exists($info['process callback'])) {
+          $output = $info['process callback']($readme, NULL);
+        }
+        else {
+          $output = '<pre>' . $readme . '</pre>';
+        }
+      }
+      else {
+        $output = '<pre>' . $readme . '</pre>';
+      }
+
+      // Add a list of supported hash_hmac algorithms.
+      if (function_exists('hash_hmac_algos')) {
+        // As of PHP 7.2+.
+        $hash_hmac_algos = hash_hmac_algos();
+      }
+      else {
+        // Before PHP 7.2.
+        // It may be that some of the algos may not be suitable for hash_hmac
+        // (see http://php.net/manual/en/function.hash-hmac-algos.php)
+        // although it' possibly a rare case.
+        $hash_hmac_algos = hash_algos();
+      }
+      $renderable = array(
+        '#theme' => 'item_list',
+        '#title' => 'Supported hashing algorithms:',
+        '#items' => $hash_hmac_algos,
+      );
+      $output .= drupal_render($renderable);
+
+      return $output;
+    }
+  }
+}
+
+/**
  * Implements hook_permission().
  */
 function commerce_gdpr_permission() {
@@ -103,19 +150,6 @@ function commerce_gdpr_menu() {
 }
 
 /**
- * Hashing parameters getter function.
- *
- * @return array
- *   Hashing parameters array.
- */
-function _commerce_gdpr_get_hashing_params() {
-  return array(
-    'salt' => variable_get('commerce_gdpr_salt', '997c1ba412abb4c3075ddf'),
-    'algo' => variable_get('commerce_gdpr_algo', 'md5'),
-  );
-}
-
-/**
  * One-way string hashing.
  *
  * @param mixed $value
@@ -123,14 +157,17 @@ function _commerce_gdpr_get_hashing_params() {
  * @param array $params
  *   Parameters describing how anonimization should be performed.
  */
-function _commerce_gdpr_anonimize_value($value, array $params = array()) {
+function commerce_gdpr_anonimize_value($value, array $params = array()) {
   $hashing_params = &drupal_static(__FUNCTION__);
   $output = NULL;
 
   switch ($params['type']) {
     case 'hash':
       if (!isset($hashing_params)) {
-        $hashing_params = _commerce_gdpr_get_hashing_params();
+        $hashing_params = array(
+          'salt' => variable_get('commerce_gdpr_salt', $GLOBALS['drupal_hash_salt']),
+          'algo' => variable_get('commerce_gdpr_algo', 'md5'),
+        );
       }
       $output = hash_hmac($hashing_params['algo'], $value, $hashing_params['salt']);
       break;
@@ -317,7 +354,7 @@ function commerce_gdpr_user_login(&$edit, $account) {
  *   If set to TRUE, entity will be anonimized even if
  *   it is already marked as anonimized.
  */
-function _commerce_gdpr_anonimize_entity($type, $entity, $is_default_revision = TRUE, $force = FALSE) {
+function commerce_gdpr_anonimize_entity($type, $entity, $is_default_revision = TRUE, $force = FALSE) {
   list($id, $vid, $bundle) = entity_extract_ids($type, $entity);
 
   // Set commerce_gdpr parameter to prevent executing other module hooks.
@@ -349,7 +386,7 @@ function _commerce_gdpr_anonimize_entity($type, $entity, $is_default_revision = 
           $entity_info['entity keys']['revision'] => $revision_id,
         ));
         $revision = reset($revisions);
-        _commerce_gdpr_anonimize_entity($type, $revision, FALSE, $force);
+        commerce_gdpr_anonimize_entity($type, $revision, FALSE, $force);
       }
     }
   }
@@ -400,7 +437,7 @@ function _commerce_gdpr_anonimize_entity($type, $entity, $is_default_revision = 
           foreach ($items as $delta => $item) {
             foreach ($item as $column => $value) {
               if (isset($column_data[$column])) {
-                $entity->{$field_name}[$langcode][$delta][$column] = _commerce_gdpr_anonimize_value($value, $column_data[$column]);
+                $entity->{$field_name}[$langcode][$delta][$column] = commerce_gdpr_anonimize_value($value, $column_data[$column]);
               }
             }
           }
@@ -415,7 +452,7 @@ function _commerce_gdpr_anonimize_entity($type, $entity, $is_default_revision = 
     $updated = TRUE;
     foreach ($properties[$type] as $property => $property_data) {
       if (!empty($entity->{$property})) {
-        $entity->{$property} = _commerce_gdpr_anonimize_value($entity->{$property}, $property_data);
+        $entity->{$property} = commerce_gdpr_anonimize_value($entity->{$property}, $property_data);
       }
     }
     entity_get_controller($type)->save($entity);
@@ -454,7 +491,7 @@ function commerce_gdpr_anonymization_worker($item) {
   $entities = entity_get_controller($item['type'])->load(array($item['id']));
   if (!empty($entities)) {
     $entity = reset($entities);
-    _commerce_gdpr_anonimize_entity($item['type'], $entity);
+    commerce_gdpr_anonimize_entity($item['type'], $entity);
   }
 }
 

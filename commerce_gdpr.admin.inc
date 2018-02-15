@@ -9,6 +9,16 @@
  * Configuration form builder.
  */
 function commerce_gdpr_admin_form($form, &$form_state) {
+
+  // Issue a warining if a site-specific hashing salt is not set.
+  if (!variable_get('commerce_gdpr_salt', FALSE)) {
+    drupal_set_message(t('To ensure increased safety of anonimized data, please set a platform-specific hashing salt. More information can be found on the module !help.', array(
+      '!help' => l(t('help page'), 'admin/help/commerce_gdpr', array(
+        'attributes' => array('target' => '_blank'),
+      )),
+    )), 'warning');
+  }
+
   $form['data_retention'] = array(
     '#type' => 'textfield',
     '#title' => t('Order data retention period'),
