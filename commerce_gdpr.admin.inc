@@ -26,6 +26,13 @@ function commerce_gdpr_admin_form($form, &$form_state) {
     '#description' => t('Enter number of days after which inactive data will be anonymized, 0 - no automatic anonymization.'),
   );
 
+  $form['user_button_text'] = array(
+    '#type' => 'textfield',
+    '#title' => t('User account anonymization button text'),
+    '#default_value' => variable_get('commerce_gdpr_user_button_text', 'I want to be forgotten'),
+    '#required' => TRUE,
+  );
+
   $form['anonymized_fields'] = array(
     '#type' => 'fieldset',
     '#title' => t('Fields subject to anonymization'),
@@ -105,6 +112,8 @@ function commerce_gdpr_admin_form_validate($form, &$form_state) {
  */
 function commerce_gdpr_admin_form_submit($form, &$form_state) {
   variable_set('commerce_gdpr_data_retention', $form_state['values']['data_retention']);
+  variable_set('commerce_gdpr_user_button_text', $form_state['values']['user_button_text']);
+
 
   $selected_fields = array();
   foreach ($form_state['values']['anonymized_fields'] as $type => $type_data) {

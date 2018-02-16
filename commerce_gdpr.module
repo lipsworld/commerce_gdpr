@@ -400,6 +400,10 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
   // Go for entity revisions first. NOTE: Why is there no API to
   // load all revisions?
   if ($is_default_revision) {
+
+    // Allow other modules do their job.
+    module_invoke_all('commerce_gdpr_entity_anonimization', $type, $entity, $properties_data, $field_data);
+
     if (!empty($entity_info['revision table'])) {
       $revision_ids = db_select($entity_info['revision table'], 'revision')
         ->fields('revision', array($entity_info['entity keys']['revision']))
@@ -417,9 +421,6 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
       }
     }
   }
-
-  // Allow other modules do their job.
-  module_invoke_all('commerce_gdpr_entity_anonimization', $type, $entity, $properties_data, $field_data);
 
   // TODO: Are there any other data types that should be subject to
   // anonymization? Other data types will be cleared.

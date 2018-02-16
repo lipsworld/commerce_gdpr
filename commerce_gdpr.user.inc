@@ -36,7 +36,7 @@ function commerce_gdpr_user_form($form, &$form_state, $uid) {
 
   $form['invoke_confirm'] = array(
     '#type' => 'submit',
-    '#value' => t('I want to be forgotten'),
+    '#value' => variable_get('commerce_gdpr_user_button_text', 'I want to be forgotten'),
     '#ajax' => array(
       'callback' => 'commerce_gdpr_user_ajax',
     ),
