@@ -37,7 +37,7 @@ function hook_commerce_gdpr_entity_property_info_alter(array &$entity_property_i
  * @param array $field_data
  *   Array of field anonymization data.
  */
-function hook_commerce_gdpr_entity_anonimization($type, $entity, $properties_data, $field_data) {
+function hook_commerce_gdpr_entity_anonimization($type, $entity, array $properties_data, array $field_data) {
   if ($type === 'node') {
     db_delete('some_custom_table')->condition('nid', $entity->nid)->execute();
   }

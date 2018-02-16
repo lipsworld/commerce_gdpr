@@ -41,7 +41,8 @@ function commerce_gdpr_admin_form($form, &$form_state) {
 
   $entity_info = entity_get_info();
   $selected_fields = variable_get('commerce_gdpr_anonymized_fields', array());
-  foreach (COMMERCE_GDPR_AFFECTED_ENTITY_TYPES as $type) {
+
+  foreach (array_keys(_commerce_gdpr_get_entity_property_info()) as $type) {
     $entity_info = entity_get_info($type);
     $form['anonymized_fields'][$type] = array(
       '#type' => 'fieldset',
@@ -113,7 +114,6 @@ function commerce_gdpr_admin_form_validate($form, &$form_state) {
 function commerce_gdpr_admin_form_submit($form, &$form_state) {
   variable_set('commerce_gdpr_data_retention', $form_state['values']['data_retention']);
   variable_set('commerce_gdpr_user_button_text', $form_state['values']['user_button_text']);
-
 
   $selected_fields = array();
   foreach ($form_state['values']['anonymized_fields'] as $type => $type_data) {

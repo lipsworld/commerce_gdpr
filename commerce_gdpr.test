@@ -83,6 +83,9 @@ class CommerceGdprFunctionalTestCase extends CommerceBaseTestCase {
     );
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function setUp() {
     // We call parent::setUp() with the list of modules we want to enable.
     $modules = parent::setUpHelper('all');

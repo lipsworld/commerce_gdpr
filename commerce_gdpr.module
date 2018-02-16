@@ -5,12 +5,6 @@
  * Main module file.
  */
 
-const COMMERCE_GDPR_AFFECTED_ENTITY_TYPES = array(
-  'user',
-  'commerce_order',
-  'commerce_customer_profile',
-);
-
 require_once __DIR__ . '/commerce_gdpr.user.inc';
 
 /**
@@ -310,7 +304,7 @@ function _commerce_gdpr_get_order_profiles($order) {
  * Implemens hook_entity_update().
  */
 function commerce_gdpr_entity_update($entity, $type) {
-  if (!in_array($type, COMMERCE_GDPR_AFFECTED_ENTITY_TYPES) || !empty($entity->commerce_gdpr_anonymization)) {
+  if (!in_array($type, array_keys(_commerce_gdpr_get_entity_property_info())) || !empty($entity->commerce_gdpr_anonymization)) {
     return;
   }
 
@@ -336,7 +330,7 @@ function commerce_gdpr_entity_update($entity, $type) {
  * Implemens hook_entity_delete().
  */
 function commerce_gdpr_entity_delete($entity, $type) {
-  if (!in_array($type, COMMERCE_GDPR_AFFECTED_ENTITY_TYPES)) {
+  if (!in_array($type, array_keys(_commerce_gdpr_get_entity_property_info()))) {
     return;
   }
 
