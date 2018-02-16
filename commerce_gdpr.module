@@ -16,58 +16,74 @@ require_once __DIR__ . '/commerce_gdpr.user.inc';
 /**
  * Get information about anonymized entity properties.
  *
+ * @param string $type
+ *   Entity type ID.
+ *
  * @return array
  *   Array of anonymization information for entity properties
- *   keyed by entity type.
+ *   or information for all entity types if $type was not provided.
  */
-function _commerce_gdpr_get_entity_property_info() {
-  $entity_property_info = array(
-    'user' => array(
-      'name' => array(
-        'type' => 'hash',
-        'max_length' => 60,
-      ),
-      'mail' => array(
-        'type' => 'hash',
-        'max_length' => 254,
-      ),
-      'signature' => array(
-        'type' => 'hash',
-        'max_length' => 255,
-      ),
-      'data' => array(
-        'type' => 'clear',
-      ),
-      // Also disable the user account.
-      'status' => array(
-        'type' => 'value',
-        'value' => 0,
-      ),
-    ),
+function _commerce_gdpr_get_entity_property_info($type = NULL) {
 
-    'commerce_order' => array(
-      'mail' => array(
-        'type' => 'hash',
-        'max_length' => 255,
-      ),
-      'hostname' => array(
-        'type' => 'hash',
-        'max_length' => 255,
-      ),
-      // NOTE: revision_hostname is always populated automatically
-      // by CommerceOrderEntityController::save(), we can't overwrite
-      // this value.
-      'data' => array(
-        'type' => 'clear',
-      ),
-    ),
-  );
+  // Use static storage, as this can be executed multiple times in one request.
+  $entity_property_info = &drupal_static(__FUNCTION__);
 
-  drupal_alter('commerce_gdpr_entity_property_info', $entity_property_info);
+  if (!isset($entity_property_info)) {
+    $entity_property_info = array(
+      'user' => array(
+        'name' => array(
+          'type' => 'hash',
+          'max_length' => 60,
+        ),
+        'mail' => array(
+          'type' => 'hash',
+          'max_length' => 254,
+        ),
+        'signature' => array(
+          'type' => 'hash',
+          'max_length' => 255,
+        ),
+        'data' => array(
+          'type' => 'clear',
+        ),
+        // Also disable the user account.
+        'status' => array(
+          'type' => 'value',
+          'value' => 0,
+        ),
+      ),
 
-  $entity_property_info['commerce_customer_profile'] = array();
+      'commerce_order' => array(
+        'mail' => array(
+          'type' => 'hash',
+          'max_length' => 255,
+        ),
+        'hostname' => array(
+          'type' => 'hash',
+          'max_length' => 255,
+        ),
+        // NOTE: revision_hostname is always populated automatically
+        // by CommerceOrderEntityController::save(), we can't overwrite
+        // this value.
+        'data' => array(
+          'type' => 'clear',
+        ),
+      ),
+    );
 
-  return $entity_property_info;
+    drupal_alter('commerce_gdpr_entity_property_info', $entity_property_info);
+
+    // We can't save commerce_customer_profile without it being duplicated
+    // by commerce so modifying its properties is out of question.
+    $entity_property_info['commerce_customer_profile'] = array();
+  }
+
+  if (isset($type)) {
+    return $entity_property_info[$type];
+  }
+  else {
+    return $entity_property_info;
+  }
 }
 
 /**
@@ -344,6 +360,8 @@ function commerce_gdpr_user_login(&$edit, $account) {
 /**
  * Data anonymization function.
  *
+ * Anonymizes an entity and all its revisions, if any.
+ *
  * @param string $type
  *   Entity type.
  * @param object $entity
@@ -372,10 +390,12 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
 
   $entity_info = entity_get_info($type);
 
+  // Get anonymized fields and properties data.
   if (!isset($field_data)) {
     $fields = variable_get('commerce_gdpr_anonymized_fields', array());
     $field_data = isset($fields[$type][$bundle]) ? $fields[$type][$bundle] : FALSE;
   }
+  $properties_data = _commerce_gdpr_get_entity_property_info($type);
 
   // Go for entity revisions first. NOTE: Why is there no API to
   // load all revisions?
@@ -397,6 +417,9 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
       }
     }
   }
+
+  // Allow other modules do their job.
+  module_invoke_all('commerce_gdpr_entity_anonimization', $type, $entity, $properties_data, $field_data);
 
   // TODO: Are there any other data types that should be subject to
   // anonymization? Other data types will be cleared.
@@ -452,10 +475,9 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
   }
 
   // Anonymize entity properties.
-  $properties = _commerce_gdpr_get_entity_property_info();
-  if (!empty($properties[$type])) {
+  if (!empty($properties_data)) {
     $updated = TRUE;
-    foreach ($properties[$type] as $property => $property_data) {
+    foreach ($properties_data as $property => $property_data) {
       if (!empty($entity->{$property})) {
         $entity->{$property} = commerce_gdpr_anonymize_value($entity->{$property}, $property_data);
       }
