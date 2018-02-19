@@ -250,19 +250,40 @@ function _commerce_gdpr_delete_info($type, $id) {
  *   Entity type.
  * @param int $id
  *   Entity ID.
+ *
+ * @return mixed
+ *   An array of last access data keyed by entity type and id or a single
+ *   last access timestamp if type and id conditions have been provided.
  */
-function _commerce_gdpr_get_info($type, $id) {
-  $last_access = db_select('commerce_gdpr_access', 'cga')
-    ->fields('cga', array('last_access'))
-    ->condition('type', $type)
-    ->condition('id', $id)
-    ->execute()
-    ->fetchField();
-
-  if ($last_access === '0') {
-    $last_access = 0;
+function _commerce_gdpr_get_info($type = NULL, $id = NULL) {
+  $query = db_select('commerce_gdpr_access', 'cga');
+  if (isset($type) && isset($id)) {
+    $query->fields('cga', array('last_access'));
+    if (isset($type)) {
+      $query->condition('type', $type);
+    }
+    if (isset($id)) {
+      $query->condition('id', $id);
+    }
+    $last_access = $query->execute()->fetchField();
+    return $last_access === FALSE ? FALSE : intval($last_access);
   }
-  return $last_access;
+  else {
+    $query->fields('cga');
+    if (isset($type)) {
+      $query->condition('type', $type);
+    }
+    if (isset($id)) {
+      $query->condition('id', $id);
+    }
+    $results = $query->execute()->fetchAll(PDO::FETCH_ASSOC);
+    $output = array();
+    foreach ($results as $item) {
+      $output[$item['type']][$item['id']] = intval($item['last_access']);
+    }
+    return $output;
+  }
+
 }
 
 /**

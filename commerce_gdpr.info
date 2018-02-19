@@ -9,4 +9,4 @@ dependencies[] = ctools:ctools
 files[] = commerce_gdpr.test
 
 test_dependencies[] = views:views
-test_dependencies[] = addressfield
+test_dependencies[] = addressfield:addressfield

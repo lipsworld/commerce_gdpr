@@ -19,7 +19,7 @@ class CommerceGdprUnitTestCase extends DrupalUnitTestCase {
    */
   public static function getInfo() {
     return array(
-      'name' => 'Commerce GPR unit tests',
+      'name' => 'Commerce GDPR unit tests',
       'description' => 'Test proper operation of key Commerce GPR functions.',
       'group' => 'Drupal Commerce',
     );
@@ -77,7 +77,7 @@ class CommerceGdprFunctionalTestCase extends CommerceBaseTestCase {
    */
   public static function getInfo() {
     return array(
-      'name' => 'Commerce GPR functional tests',
+      'name' => 'Commerce GDPR functional tests',
       'description' => 'Test proper operation of key Commerce GPR functions.',
       'group' => 'Drupal Commerce',
     );

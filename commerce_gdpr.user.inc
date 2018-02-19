@@ -10,8 +10,16 @@
  */
 function commerce_gdpr_user_view($account, $view_mode, $langcode) {
   if ($account->uid == $GLOBALS['user']->uid || user_access('anonymize other users data')) {
-    $account->content['gdpr_widget'] = drupal_get_form('commerce_gdpr_user_form', $account->uid);
-    $account->content['gdpr_widget']['#weight'] = 999;
+
+    // Check if the user is already anonymized.
+    $last_access = _commerce_gdpr_get_info($type, $id);
+    if ($last_access === 0) {
+      drupal_set_message(t('This user account data has been anonymized.'));
+    }
+    else {
+      $account->content['gdpr_widget'] = drupal_get_form('commerce_gdpr_user_form', $account->uid);
+      $account->content['gdpr_widget']['#weight'] = 999;
+    }
   }
 }
 
