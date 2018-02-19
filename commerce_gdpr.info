@@ -7,3 +7,6 @@ dependencies[] = commerce:commerce
 dependencies[] = commerce:commerce_order
 dependencies[] = ctools:ctools
 files[] = commerce_gdpr.test
+
+test_dependencies[] = views:views
+test_dependencies[] = addressfield
