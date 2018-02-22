@@ -528,7 +528,7 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
         $entity->{$property} = commerce_gdpr_anonymize_value($entity->{$property}, $property_data);
       }
     }
-    entity_get_controller($type)->save($entity);
+    entity_metadata_wrapper($type, $entity)->save();
   }
 
   // If no properties have were changed, it's enough to save field
