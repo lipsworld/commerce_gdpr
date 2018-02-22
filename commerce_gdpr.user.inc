@@ -89,7 +89,7 @@ function commerce_gdpr_modal_form($form, &$form_state) {
     }
     else {
       $form['message'] = array(
-        '#markup' => t('Are you sure yuo wish to anonymize data of this user?'),
+        '#markup' => t('Are you sure you wish to anonymize data of this user?'),
       );
     }
   }
