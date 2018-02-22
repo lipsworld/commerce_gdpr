@@ -218,14 +218,19 @@ function commerce_gdpr_anonymize_value($value, array $params = array()) {
  *   has already been anonymized.
  */
 function _commerce_gdpr_update_info($type, $id, $time = REQUEST_TIME) {
-  $key = array(
-    'type' => $type,
-    'id' => $id,
-  );
-  db_merge('commerce_gdpr_access')
-    ->key($key)
-    ->fields($key + ['last_access' => $time])
-    ->execute();
+
+  // Act only if the entity hasn't been anonymized yet.
+  $last_access = _commerce_gdpr_get_info($type, $id);
+  if ($last_access !== 0) {
+    $key = array(
+      'type' => $type,
+      'id' => $id,
+    );
+    db_merge('commerce_gdpr_access')
+      ->key($key)
+      ->fields($key + ['last_access' => $time])
+      ->execute();
+  }
 }
 
 /**
@@ -357,6 +362,31 @@ function commerce_gdpr_entity_delete($entity, $type) {
 
   list($id,,) = entity_extract_ids($type, $entity);
   _commerce_gdpr_delete_info($type, $id);
+}
+
+/**
+ * Implements hook_entity_view().
+ */
+function commerce_gdpr_entity_load($entities, $type) {
+  if (!in_array($type, array_keys(_commerce_gdpr_get_entity_property_info()))) {
+    return;
+  }
+
+  $ids = array();
+  foreach ($entities as $id => $entity) {
+    $ids[] = $id;
+  }
+  $query = db_select('commerce_gdpr_access', 'cga');
+  $query->fields('cga', array('id', 'last_access'));
+  $query->condition('type', $type);
+  $query->condition('id', $ids);
+  $last_access_data = $query->execute()->fetchAllKeyed();
+  foreach ($last_access_data as $id => $last_access) {
+    if ($last_access == 0) {
+      $entities[$id]->anonymized = TRUE;
+    }
+  }
+
 }
 
 /**
@@ -550,6 +580,7 @@ function commerce_gdpr_cron() {
       ->fields('cga')
       ->condition('last_access', 0, '>')
       ->condition('last_access', $condition, '<')
+      ->execute()
       ->fetchAll(PDO::FETCH_ASSOC);
 
     if (!empty($results)) {

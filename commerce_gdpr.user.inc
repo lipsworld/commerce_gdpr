@@ -12,7 +12,7 @@ function commerce_gdpr_user_view($account, $view_mode, $langcode) {
   if ($account->uid == $GLOBALS['user']->uid || user_access('anonymize other users data')) {
 
     // Check if the user is already anonymized.
-    $last_access = _commerce_gdpr_get_info($type, $id);
+    $last_access = _commerce_gdpr_get_info('user', $id);
     if ($last_access === 0) {
       drupal_set_message(t('This user account data has been anonymized.'));
     }
