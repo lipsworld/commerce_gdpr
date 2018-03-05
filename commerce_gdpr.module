@@ -609,12 +609,14 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
  * Implements hook_user_operations().
  */
 function commerce_gdpr_user_operations() {
-  return array(
-    'anonymize' => array(
-      'label' => t('Anonymize the selected users data'),
-      'callback' => 'commerce_gdpr_user_operations_anonymize',
-    ),
-  );
+  if (FALSE && user_access('anonymize other users data bulk')) {
+    return array(
+      'anonymize' => array(
+        'label' => t('Anonymize the selected users data'),
+        'callback' => 'commerce_gdpr_user_operations_anonymize',
+      ),
+    );
+  }
 }
 
 /**
