@@ -11,10 +11,14 @@
 function commerce_gdpr_user_view($account, $view_mode, $langcode) {
   if ($account->uid == $GLOBALS['user']->uid || user_access('anonymize other users data')) {
 
-    // Check if the user is already anonymized.
+    // Check if the user is already anonymized or has been scheduled
+    // for anonymization.
     $last_access = _commerce_gdpr_get_info('user', $account->uid);
     if ($last_access === 0) {
       drupal_set_message(t('This user account data has been anonymized.'));
+    }
+    elseif (!empty($account->data['commerce_gdpr_anonymization'])) {
+      drupal_set_message(t('This account has been scheduled for anonymization.'), 'warning');
     }
     else {
       $account->content['gdpr_widget'] = drupal_get_form('commerce_gdpr_user_form', $account->uid);
@@ -156,52 +160,89 @@ function commerce_gdpr_modal_form_submit($form, &$form_state) {
 
   if ($trigger === 'anonymize') {
 
-    $queue_items = array();
+    $account = user_load($form_state['uid']);
 
-    // Better don't anonymize the superuser data.
-    if ($form_state['uid'] != 1) {
-      $queue_items[] = array(
-        'type' => 'user',
-        'id' => $form_state['uid'],
-      );
+    $queue_items = _commerce_gdpr_get_user_queue_items($account);
+
+    if (variable_get('commerce_gdpr_direct_processing', FALSE)) {
+      foreach ($queue_items as $item) {
+        commerce_gdpr_anonymization_worker($item);
+      }
     }
-
-    // Get orders.
-    $orders = commerce_order_load_multiple(array(), array('uid' => $form_state['uid']));
-    foreach ($orders as $order) {
-      $queue_items[] = array(
-        'type' => 'commerce_order',
-        'id' => $order->order_id,
-      );
-    }
-
-    // Get profiles.
-    $profiles = commerce_customer_profile_load_multiple(array(), array('uid' => $form_state['uid']));
-    foreach ($profiles as $profile) {
-      $queue_items[] = array(
-        'type' => 'commerce_customer_profile',
-        'id' => $profile->profile_id,
-      );
-    }
-
-    $queue = DrupalQueue::get('commerce_gdpr_anonymization');
-    foreach ($queue_items as $item) {
-      $queue->createItem($item);
+    else {
+      $queue = DrupalQueue::get('commerce_gdpr_anonymization');
+      foreach ($queue_items as $item) {
+        $queue->createItem($item);
+      }
     }
 
     // Logout user if the current user is anonymizing his own account.
     if ($form_state['uid'] == $GLOBALS['user']->uid && $form_state['uid'] != 1) {
       $account = user_load($form_state['uid']);
       $account->status = 0;
-      user_save($account);
       module_invoke_all('user_logout', $account);
       session_destroy();
 
       $form_state['redirect'] = '';
-      drupal_set_message(t('Your account data has been scheduled for anonymization.'));
+      if (variable_get('commerce_gdpr_direct_processing', FALSE)) {
+        drupal_set_message(t('Your account data has been anonymized.'));
+      }
+      else {
+        drupal_set_message(t('Your account data has been scheduled for anonymization.'));
+      }
     }
     else {
-      drupal_set_message(t('Account data has been scheduled for anonymization.'));
+      if (variable_get('commerce_gdpr_direct_processing', FALSE)) {
+        drupal_set_message(t('Account data has been anonymized.'));
+      }
+      else {
+        drupal_set_message(t('Account data has been scheduled for anonymization.'));
+      }
+    }
+
+    $account->data['commerce_gdpr_anonymization'] = TRUE;
+    user_save($account);
+  }
+}
+
+/**
+ * Bulk anonymize users operation callback.
+ */
+function commerce_gdpr_user_operations_anonymize($accounts) {
+  $accounts = user_load_multiple($accounts);
+  $count = 0;
+  $anonymized = 0;
+  $direct_processing = variable_get('commerce_gdpr_direct_processing', FALSE);
+  if ($direct_processing) {
+    $queue = DrupalQueue::get('commerce_gdpr_anonymization');
+  }
+
+  foreach ($accounts as $account) {
+    if (empty($account->anonymized)) {
+      $queue_items = _commerce_gdpr_get_user_queue_items($account);
+      if ($direct_processing) {
+        foreach ($queue_items as $item) {
+          commerce_gdpr_anonymization_worker($item);
+        }
+      }
+      else {
+        foreach ($queue_items as $item) {
+          $queue->createItem($item);
+        }
+      }
+      $count++;
+    }
+    else {
+      $anonymized++;
     }
   }
+  if ($count) {
+    drupal_set_message(format_plural($count, '1 account has been scheduled for anonymization.', '@count accounts have been scheduled for anonymization.'));
+  }
+  if ($anonymized) {
+    drupal_set_message(t('@count of the selected accounts have already been anonymized.', array(
+      '@count' => $anonymized,
+    )), 'warning');
+  }
+
 }

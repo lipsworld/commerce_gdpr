@@ -219,6 +219,11 @@ function commerce_gdpr_anonymize_value($value, array $params = array()) {
  */
 function _commerce_gdpr_update_info($type, $id, $time = REQUEST_TIME) {
 
+  // Always skip user 1 and user 0.
+  if ($type === 'user' && ($id == 1 || $id == 0)) {
+    return;
+  }
+
   // Act only if the entity hasn't been anonymized yet.
   $last_access = _commerce_gdpr_get_info($type, $id);
   if ($last_access !== 0) {
@@ -303,27 +308,89 @@ function commerce_gdpr_entity_insert($entity, $type) {
 }
 
 /**
- * Helper hunction that gets all profiles associated with an order.
+ * Helper hunction that gets all profiles and orders associated with a user.
  */
-function _commerce_gdpr_get_order_profiles($order) {
-  $profile_ids = [];
+function _commerce_gdpr_get_user_queue_items($account) {
+  $queue_items = array();
 
-  $instances = field_info_instances('commerce_order', $order->type);
-  foreach ($instances as $field_name => $data) {
-    $field_info = field_info_field($field_name);
-    if ($field_info['type'] === 'commerce_customer_profile_reference') {
-      $items = field_get_items('commerce_order', $order, $field_name);
-      if (!empty($items)) {
-        foreach ($items as $item) {
-          if (!empty($item['profile_id'])) {
-            $profile_ids[$item['profile_id']] = $item['profile_id'];
-          }
-        }
+  // First check if the user wasn't anonymized before.
+  // Use the anonymized user email as an identifier.
+  $user_property_info = _commerce_gdpr_get_entity_property_info('user');
+  $anonymized_mail = commerce_gdpr_anonymize_value($account->mail, $user_property_info['mail']);
+  $uid = db_select('users', 'u')
+    ->fields('u', array('uid'))
+    ->condition('mail', $anonymized_mail)
+    ->execute()
+    ->fetchField();
+
+  // Also check the user name that has to be unique.
+  // If a user with the same name but different email existed, change the
+  // currently anonymized user name.
+  if ($uid === FALSE) {
+    $rename = FALSE;
+    $name_base = $account->name;
+    $iteration = 0;
+    do {
+      $anonymized_username = commerce_gdpr_anonymize_value($account->name, $user_property_info['name']);
+
+      $check = db_select('users', 'u')
+        ->fields('u', array('uid'))
+        ->condition('name', $anonymized_username)
+        ->condition('uid', $account->uid, '<>')
+        ->execute()
+        ->fetchField();
+      if ($check) {
+        $account->name = $name_base . '_' . ($iteration++);
       }
+    } while ($check);
+
+    if ($name_base !== $account->name) {
+      user_save($account);
     }
   }
 
-  return $profile_ids;
+  // Get orders.
+  $orders = commerce_order_load_multiple(array(), array('uid' => $account->uid));
+  foreach ($orders as $order) {
+    if (empty($order->anonymized)) {
+      $queue_items[] = array(
+        'type' => 'commerce_order',
+        'id' => $order->order_id,
+        'uid' => $uid,
+      );
+    }
+  }
+
+  // Get profiles.
+  $profiles = commerce_customer_profile_load_multiple(array(), array('uid' => $account->uid));
+  foreach ($profiles as $profile) {
+    if (empty($profile->anonymized)) {
+      $queue_items[] = array(
+        'type' => 'commerce_customer_profile',
+        'id' => $profile->profile_id,
+        'uid' => $uid,
+      );
+    }
+  }
+
+  // Last item: delete or anonymize the user account.
+  if ($uid) {
+    $queue_items[] = array(
+      'type' => 'user',
+      'id' => $account->uid,
+      'delete' => TRUE,
+    );
+  }
+  elseif ($account->uid !== 1) {
+    if (empty($account->anonymized)) {
+      $queue_items[] = array(
+        'type' => 'user',
+        'id' => $account->uid,
+      );
+    }
+  }
+
+  return $queue_items;
 }
 
 /**
@@ -334,22 +401,14 @@ function commerce_gdpr_entity_update($entity, $type) {
     return;
   }
 
-  // If an order was updated, also update referenced customer profiles.
-  if ($type === 'commerce_order') {
-    $profile_ids = _commerce_gdpr_get_order_profiles($entity);
-    foreach ($profile_ids as $profile_id) {
-      _commerce_gdpr_update_info('commerce_customer_profile', $profile_id);
-    }
-
-    // Also update the last access of the order owner.
-    if ($entity->uid) {
-      _commerce_gdpr_update_info('user', $entity->uid);
-    }
-
+  // Update the last access of the entity owner if not owned by an anonymous user.
+  if (isset($entity->uid) && !empty($entity->uid)) {
+    _commerce_gdpr_update_info('user', $entity->uid);
   }
-
-  list($id,,) = entity_extract_ids($type, $entity);
-  _commerce_gdpr_update_info($type, $id);
+  else {
+    list($id,,) = entity_extract_ids($type, $entity);
+    _commerce_gdpr_update_info($type, $id);
+  }
 }
 
 /**
@@ -438,7 +497,7 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
   // Get anonymized fields and properties data.
   if (!isset($field_data)) {
     $fields = variable_get('commerce_gdpr_anonymized_fields', array());
-    $field_data = isset($fields[$type][$bundle]) ? $fields[$type][$bundle] : FALSE;
+    $field_data = isset($fields[$type][$bundle]) ? $fields[$type][$bundle] : array();
   }
   $properties_data = _commerce_gdpr_get_entity_property_info($type);
 
@@ -447,7 +506,7 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
   if ($is_default_revision) {
 
     // Allow other modules do their job.
-    module_invoke_all('commerce_gdpr_entity_anonimization', $type, $entity, $properties_data, $field_data);
+    module_invoke_all('commerce_gdpr_entity_anonymization', $type, $entity, $properties_data, $field_data);
 
     if (!empty($entity_info['revision table'])) {
       $revision_ids = db_select($entity_info['revision table'], 'revision')
@@ -547,6 +606,18 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
 }
 
 /**
+ * Implements hook_user_operations().
+ */
+function commerce_gdpr_user_operations() {
+  return array(
+    'anonymize' => array(
+      'label' => t('Anonymize the selected users data'),
+      'callback' => 'commerce_gdpr_user_operations_anonymize',
+    ),
+  );
+}
+
+/**
  * Implements hook_cron_queue_info().
  */
 function commerce_gdpr_cron_queue_info() {
@@ -561,10 +632,30 @@ function commerce_gdpr_cron_queue_info() {
  * Queue worker callback.
  */
 function commerce_gdpr_anonymization_worker($item) {
+
   $entities = entity_get_controller($item['type'])->load(array($item['id']));
   if (!empty($entities)) {
     $entity = reset($entities);
-    commerce_gdpr_anonymize_entity($item['type'], $entity);
+    if (!empty($item['delete'])) {
+      entity_metadata_wrapper($item['type'], $entity)->delete();
+    }
+    else {
+      commerce_gdpr_anonymize_entity($item['type'], $entity);
+
+      // Optionally change ownership of the entity.
+      if (!empty($item['uid'])) {
+        if ($item['type'] === 'commerce_customer_profile') {
+          db_update('commerce_customer_profile')
+            ->fields(array('uid' => $item['uid']))
+            ->condition('profile_id', $entity->profile_id)
+            ->execute();
+        }
+        else {
+          $entity->uid = $item['uid'];
+          entity_metadata_wrapper($item['type'], $entity)->save();
+        }
+      }
+    }
   }
 }
 
@@ -594,7 +685,16 @@ function commerce_gdpr_cron() {
 
       // Add items to be processed in the next cron queue.
       foreach ($results as $item) {
-        $queue->createItem($item);
+        if ($item['type'] === 'user') {
+          $account = user_load($item['id']);
+          $items = _commerce_gdpr_get_user_queue_items($account);
+          foreach ($items as $item) {
+            $queue->createItem($item);
+          }
+        }
+        else {
+          $queue->createItem($item);
+        }
       }
     }
   }

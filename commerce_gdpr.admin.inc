@@ -11,7 +11,7 @@
 function commerce_gdpr_admin_form($form, &$form_state) {
 
   // Issue a warining if a site-specific hashing salt is not set.
-  if (!variable_get('commerce_gdpr_salt', FALSE)) {
+  if (!variable_get('commerce_gdpr_salt', FALSE) && empty($form_state['input'])) {
     drupal_set_message(t('To ensure increased safety of anonymized data, please set a platform-specific hashing salt. More information can be found on the module !help.', array(
       '!help' => l(t('help page'), 'admin/help/commerce_gdpr', array(
         'attributes' => array('target' => '_blank'),
@@ -24,6 +24,13 @@ function commerce_gdpr_admin_form($form, &$form_state) {
     '#title' => t('Order data retention period'),
     '#default_value' => variable_get('commerce_gdpr_data_retention', 0),
     '#description' => t('Enter number of days after which inactive data will be anonymized, 0 - no automatic anonymization.'),
+  );
+
+  $form['direct_processing'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Process items immediately'),
+    '#description' => t('Process items immediately on the user form and during the "People" page bulk operation rather then enqueing the operations. NOTE: may cause performance issues in case of users with many orders.'),
+    '#default_value' => variable_get('commerce_gdpr_direct_processing', 0),
   );
 
   $form['user_button_text'] = array(
@@ -113,6 +120,7 @@ function commerce_gdpr_admin_form_validate($form, &$form_state) {
  */
 function commerce_gdpr_admin_form_submit($form, &$form_state) {
   variable_set('commerce_gdpr_data_retention', $form_state['values']['data_retention']);
+  variable_set('commerce_gdpr_direct_processing', $form_state['values']['direct_processing']);
   variable_set('commerce_gdpr_user_button_text', $form_state['values']['user_button_text']);
 
   $selected_fields = array();
