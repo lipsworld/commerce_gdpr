@@ -206,12 +206,81 @@ function commerce_gdpr_modal_form_submit($form, &$form_state) {
 }
 
 /**
- * Bulk anonymize users operation callback.
+ * Router function for bulk anonymize operation.
  */
-function commerce_gdpr_user_operations_anonymize($accounts) {
-  $accounts = user_load_multiple($accounts);
-  $count = 0;
-  $anonymized = 0;
+function commerce_gdpr_user_operations_anonymize_router($accounts) {
+  $_SESSION['commerce_gdpr_bulk_anonymize'] = $accounts;
+  drupal_goto('admin/people/commerce-gdpr-confirm', array('query' => drupal_get_destination()));
+}
+
+/**
+ * Bulk anonymization confirmation form builder.
+ */
+function commerce_gdpr_user_bulk_confirm_form($form, &$form_state) {
+  $accounts = user_load_multiple($_SESSION['commerce_gdpr_bulk_anonymize']);
+  $to_anonymize = array();
+  $already_done = array();
+  foreach ($accounts as $account) {
+    if (empty($account->anonymized)) {
+      $to_anonymize[] = $account;
+    }
+    else {
+      $already_done[] = $account;
+    }
+  }
+
+  if (!empty($to_anonymize)) {
+    $form['to_anonymize'] = array(
+      '#theme' => 'item_list',
+      '#title' => t("Accounts subject to anonymization"),
+      '#items' => array(),
+    );
+    foreach ($to_anonymize as $account) {
+      $form['to_anonymize']['#items'][] = $account->name;
+    }
+  }
+  if (!empty($already_done)) {
+    $form['already_done'] = array(
+      '#theme' => 'item_list',
+      '#title' => t("Accounts already anonymized"),
+      '#items' => array(),
+    );
+    foreach ($already_done as $account) {
+      $form['already_done']['#items'][] = $account->name;
+    }
+  }
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['back'] = array(
+    '#type' => 'submit',
+    '#value' => t('Back'),
+  );
+  if (!empty($to_anonymize)) {
+    $form['actions']['anonymize'] = array(
+      '#type' => 'submit',
+      '#value' => t('Anonymize accounts'),
+    );
+    $form_state['_accounts'] = array();
+    foreach ($to_anonymize as $account) {
+      $form_state['_accounts'][] = $account->uid;
+    }
+  }
+
+  return $form;
+}
+
+/**
+ * Bulk anonymize users operation submit handler.
+ */
+function commerce_gdpr_user_bulk_confirm_form_submit($form, &$form_state) {
+  unset($_SESSION['commerce_gdpr_bulk_anonymize']);
+
+  $op = end($form_state['triggering_element']['#parents']);
+  if ($op !== 'anonymize') {
+    return;
+  }
+
+  $accounts = user_load_multiple($form_state['_accounts']);
   $direct_processing = variable_get('commerce_gdpr_direct_processing', FALSE);
   if ($direct_processing) {
     $queue = DrupalQueue::get('commerce_gdpr_anonymization');
@@ -230,19 +299,12 @@ function commerce_gdpr_user_operations_anonymize($accounts) {
           $queue->createItem($item);
         }
       }
-      $count++;
-    }
-    else {
-      $anonymized++;
     }
   }
-  if ($count) {
-    drupal_set_message(format_plural($count, '1 account has been scheduled for anonymization.', '@count accounts have been scheduled for anonymization.'));
+  if ($direct_processing) {
+    drupal_set_message(format_plural(count($accounts), '1 account has been anonymized.', '@count accounts have been anonymized.'));
   }
-  if ($anonymized) {
-    drupal_set_message(t('@count of the selected accounts have already been anonymized.', array(
-      '@count' => $anonymized,
-    )), 'warning');
+  else {
+    drupal_set_message(format_plural(count($accounts), '1 account has been scheduled for anonymization.', '@count accounts have been scheduled for anonymization.'));
   }
-
 }

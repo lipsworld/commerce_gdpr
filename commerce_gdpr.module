@@ -156,6 +156,14 @@ function commerce_gdpr_menu() {
     'file' => 'commerce_gdpr.admin.inc',
   );
 
+  $items['admin/people/commerce-gdpr-confirm'] = array(
+    'title' => 'Confirm bulk anonymization',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('commerce_gdpr_user_bulk_confirm_form'),
+    'access arguments' => array('anonymize other users data'),
+    'type' => MENU_CALLBACK,
+  );
+
   return $items;
 }
 
@@ -609,11 +617,11 @@ function commerce_gdpr_anonymize_entity($type, $entity, array $field_data = NULL
  * Implements hook_user_operations().
  */
 function commerce_gdpr_user_operations() {
-  if (FALSE && user_access('anonymize other users data bulk')) {
+  if (user_access('anonymize other users data')) {
     return array(
       'anonymize' => array(
         'label' => t('Anonymize the selected users data'),
-        'callback' => 'commerce_gdpr_user_operations_anonymize',
+        'callback' => 'commerce_gdpr_user_operations_anonymize_router',
       ),
     );
   }
