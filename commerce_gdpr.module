@@ -335,7 +335,6 @@ function _commerce_gdpr_get_user_queue_items($account) {
   // If a user with the same name but different email existed, change the
   // currently anonymized user name.
   if ($uid === FALSE) {
-    $rename = FALSE;
     $name_base = $account->name;
     $iteration = 0;
     do {
@@ -409,7 +408,8 @@ function commerce_gdpr_entity_update($entity, $type) {
     return;
   }
 
-  // Update the last access of the entity owner if not owned by an anonymous user.
+  // Update the last access of the entity owner if not owned by an anonymous
+  // user.
   if (isset($entity->uid) && !empty($entity->uid)) {
     _commerce_gdpr_update_info('user', $entity->uid);
   }

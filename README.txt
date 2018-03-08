@@ -1,6 +1,6 @@
 TABLE OF CONTENTS
 -----------------
-   
+
  * Introduction
  * Requirements
  * Installation
